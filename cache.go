@@ -15,6 +15,8 @@ const (
 )
 
 var KeyNotFoundError = errors.New("Key not found.")
+var ReachedMaxSizeErr = errors.New("reached max size")
+var EmptyErr = errors.New("cache is empty")
 
 type Cache interface {
 	Set(key, value interface{}) error
@@ -44,6 +46,9 @@ type baseCache struct {
 	expiration       *time.Duration
 	mu               sync.RWMutex
 	loadGroup        Group
+	expireFunction   ExpiredFunction
+	sortKeysFunc     SortKeysFunction
+	searchCmpFunc    SearchCompareFunction
 	*stats
 }
 
@@ -55,6 +60,9 @@ type (
 	AddedFunc        func(interface{}, interface{})
 	DeserializeFunc  func(interface{}, interface{}) (interface{}, error)
 	SerializeFunc    func(interface{}, interface{}) (interface{}, error)
+	ExpiredFunction       func(interface{}) bool
+	SortKeysFunction      func([]interface{}, []interface{}, func(interface{}) (interface{}, bool)) ([]interface{}, bool)
+	SearchCompareFunction func(value interface{}, anotherValue interface{}) int
 )
 
 type CacheBuilder struct {
@@ -68,6 +76,10 @@ type CacheBuilder struct {
 	expiration       *time.Duration
 	deserializeFunc  DeserializeFunc
 	serializeFunc    SerializeFunc
+
+	expireFunction   ExpiredFunction
+	sortKeysFunction SortKeysFunction
+	searchCmpFunc    SearchCompareFunction
 }
 
 func New(size int) *CacheBuilder {
@@ -152,6 +164,16 @@ func (cb *CacheBuilder) Expiration(expiration time.Duration) *CacheBuilder {
 	return cb
 }
 
+func (cb *CacheBuilder) SortKeysFunc(sortKeysFunction SortKeysFunction) *CacheBuilder {
+	cb.sortKeysFunction = sortKeysFunction
+	return cb
+}
+
+func (cb *CacheBuilder) SearchCompareFunction(searchFunction SearchCompareFunction) *CacheBuilder {
+	cb.searchCmpFunc = searchFunction
+	return cb
+}
+
 func (cb *CacheBuilder) Build() Cache {
 	if cb.size <= 0 && cb.tp != TYPE_SIMPLE {
 		panic("gcache: Cache size <= 0")
@@ -159,6 +181,26 @@ func (cb *CacheBuilder) Build() Cache {
 
 	return cb.build()
 }
+func (cb *CacheBuilder) BuildOrderedCache() OrderedCache {
+	if cb.size <= 0 {
+		panic("gcache: Cache size <= 0")
+	}
+	cb.tp = TYPE_SIMPLE
+	return cb.buildOrderedCache()
+}
+
+func (cb *CacheBuilder) buildOrderedCache() OrderedCache {
+	//if cb.keyTypeFunction ==nil {
+	//panic("key types function is nil")
+	//}
+	switch cb.tp {
+	case TYPE_SIMPLE:
+		return newSimpleOrderedCache(cb)
+	default:
+		panic("gcache: Unknown type " + cb.tp)
+	}
+}
+
 
 func (cb *CacheBuilder) build() Cache {
 	switch cb.tp {
@@ -185,6 +227,9 @@ func buildCache(c *baseCache, cb *CacheBuilder) {
 	c.serializeFunc = cb.serializeFunc
 	c.evictedFunc = cb.evictedFunc
 	c.purgeVisitorFunc = cb.purgeVisitorFunc
+	c.expireFunction = cb.expireFunction
+	c.sortKeysFunc = cb.sortKeysFunction
+	c.searchCmpFunc = cb.searchCmpFunc
 	c.stats = &stats{}
 }
 

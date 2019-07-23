@@ -32,6 +32,7 @@ type call struct {
 // units of work can be executed with duplicate suppression.
 type Group struct {
 	cache Cache
+	orderedCache OrderedCache
 	mu    sync.Mutex            // protects m
 	m     map[interface{}]*call // lazily initialized
 }
