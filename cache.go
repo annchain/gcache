@@ -113,6 +113,11 @@ func (cb *CacheBuilder) LoaderExpireFunc(loaderExpireFunc LoaderExpireFunc) *Cac
 	return cb
 }
 
+func (cb *CacheBuilder) ExpiredFunc(expiredFunction ExpiredFunction) *CacheBuilder {
+	cb.expireFunction = expiredFunction
+	return cb
+}
+
 func (cb *CacheBuilder) EvictType(tp string) *CacheBuilder {
 	cb.tp = tp
 	return cb

@@ -11,7 +11,7 @@ import (
 func newtestSimploOrderCache(serachFunc SearchCompareFunction) *SimpleOrderedCache {
 	DebugMode = true
 	logrus.SetLevel(logrus.TraceLevel)
-	c := New(100000).Simple().Expiration(time.Second * 10).SearchCompareFunction(serachFunc).BuildOrderedCache()
+	c := New(100000).Simple().Expiration(time.Second * 10).SearchCompareFunction(serachFunc).ExpiredFunc(nil).BuildOrderedCache()
 	return c.(*SimpleOrderedCache)
 
 }
